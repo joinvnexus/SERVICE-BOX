@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("CLIENT")
+  balance   Float    @default(0)
+  createdAt DateTime @default(now())
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  hourlyRate  Float
+  status      String   @default("ACTIVE")
+  freelancerId String
+  createdAt   DateTime @default(now())
+}
+
+model Booking {
+  id              String   @id @default(cuid())
+  hours           Int
+  totalAmount     Float
+  status          String   @default("PENDING_PAYMENT")
+  startDate       DateTime?
+  workSubmittedAt DateTime?
+  completedAt     DateTime?
+  paymentIntentId String?
+  
+  clientId     String
+  freelancerId String
+  serviceId    String
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  
+  bookingId String
+  senderId  String
+}
