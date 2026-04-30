@@ -1,5 +1,6 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import { authMiddleware } from '../middleware/auth.middleware.ts';
+import type { AuthRequest } from '../middleware/auth.middleware.ts';
 import { PrismaClient } from '@prisma/client';
 
 const router = Router();
@@ -33,11 +34,49 @@ router.post('/', authMiddleware, async (req: any, res) => {
   }
 });
 
-// ✅ Get single booking by ID (with all details)
-router.get('/:id', authMiddleware, async (req: any, res) => {
+// Get my bookings (Client)
+router.get('/my-bookings', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
-    const userId = req.user.id;
+    const bookings = await prisma.booking.findMany({
+      where: { clientId: req.user?.id },
+      include: {
+        service: true,
+        freelancer: {
+          select: { id: true, name: true, email: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(bookings);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch bookings' });
+  }
+});
+
+// Get bookings for freelancer
+router.get('/freelancer-bookings', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const bookings = await prisma.booking.findMany({
+      where: { freelancerId: req.user?.id },
+      include: {
+        service: true,
+        client: {
+          select: { id: true, name: true, email: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(bookings);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch bookings' });
+  }
+});
+
+// ✅ Get single booking by ID (with all details)
+router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const userId = req.user?.id;
 
     const booking = await prisma.booking.findUnique({
       where: { id },
@@ -56,6 +95,10 @@ router.get('/:id', authMiddleware, async (req: any, res) => {
       return res.status(404).json({ error: 'Booking not found' });
     }
 
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     // Check if user is authorized (client or freelancer)
     if (booking.clientId !== userId && booking.freelancerId !== userId) {
       return res.status(403).json({ error: 'Unauthorized' });
@@ -69,11 +112,11 @@ router.get('/:id', authMiddleware, async (req: any, res) => {
 });
 
 // ✅ Update booking status (for various actions)
-router.patch('/:id/status', authMiddleware, async (req: any, res) => {
+router.patch('/:id/status', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const { status } = req.body;
-    const userId = req.user.id;
+    const userId = req.user?.id;
 
     const booking = await prisma.booking.findUnique({
       where: { id }
@@ -81,6 +124,10 @@ router.patch('/:id/status', authMiddleware, async (req: any, res) => {
 
     if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
 
     // Status transition validation
@@ -111,7 +158,7 @@ router.patch('/:id/status', authMiddleware, async (req: any, res) => {
       return res.status(403).json({ error: 'Only client can complete booking' });
     }
 
-    const updateData: any = { status };
+    const updateData: { status: string; startDate?: Date; workSubmittedAt?: Date; completedAt?: Date } = { status };
     
     if (status === 'IN_PROGRESS') {
       updateData.startDate = new Date();
@@ -125,6 +172,10 @@ router.patch('/:id/status', authMiddleware, async (req: any, res) => {
       updateData.completedAt = new Date();
     }
 
+    if (!id) {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
+
     const updatedBooking = await prisma.booking.update({
       where: { id },
       data: updateData
@@ -134,44 +185,6 @@ router.patch('/:id/status', authMiddleware, async (req: any, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to update booking' });
-  }
-});
-
-// Get my bookings (Client)
-router.get('/my-bookings', authMiddleware, async (req: any, res) => {
-  try {
-    const bookings = await prisma.booking.findMany({
-      where: { clientId: req.user.id },
-      include: {
-        service: true,
-        freelancer: {
-          select: { id: true, name: true, email: true }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-    res.json(bookings);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch bookings' });
-  }
-});
-
-// Get bookings for freelancer
-router.get('/freelancer-bookings', authMiddleware, async (req: any, res) => {
-  try {
-    const bookings = await prisma.booking.findMany({
-      where: { freelancerId: req.user.id },
-      include: {
-        service: true,
-        client: {
-          select: { id: true, name: true, email: true }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-    res.json(bookings);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch bookings' });
   }
 });
 
