@@ -8,23 +8,30 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String
-  role      String   @default("CLIENT")
-  balance   Float    @default(0)
-  createdAt DateTime @default(now())
+  id               String    @id @default(cuid())
+  name             String
+  email            String    @unique
+  password         String
+  role             String    @default("CLIENT")
+  balance          Float     @default(0)
+  createdAt        DateTime  @default(now())
+
+  services         Service[]
+  clientBookings   Booking[] @relation("ClientBookings")
+  freelancerBookings Booking[] @relation("FreelancerBookings")
 }
 
 model Service {
-  id          String   @id @default(cuid())
-  title       String
-  description String
-  hourlyRate  Float
-  status      String   @default("ACTIVE")
+  id           String   @id @default(cuid())
+  title        String
+  description  String
+  hourlyRate   Float
+  status       String   @default("ACTIVE")
   freelancerId String
-  createdAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  freelancer   User     @relation(fields: [freelancerId], references: [id])
+  bookings     Booking[]
 }
 
 model Booking {
@@ -36,10 +43,15 @@ model Booking {
   workSubmittedAt DateTime?
   completedAt     DateTime?
   paymentIntentId String?
-  
+  createdAt       DateTime @default(now())
+
   clientId     String
   freelancerId String
   serviceId    String
+
+  client       User    @relation("ClientBookings", fields: [clientId], references: [id])
+  freelancer   User    @relation("FreelancerBookings", fields: [freelancerId], references: [id])
+  service      Service @relation(fields: [serviceId], references: [id])
 }
 
 model Message {
